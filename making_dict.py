@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from flask import Flask,render_template,url_for,request
 token='EAAJBlNIzKkQBAJfkNomm69xK93o5QGUVrqSkSqfXIKCUfrKZCRFZBoU0GnLEALm9lARUzIpQ6GguNoGy8xg5kR8NvRJtwLTwimn3EZCWkHPVhyHjBQqkVnCVRCDwGF1LXyfKpcZCKaZBwZCJAWpbsVzDoxSaF2ZCDKuvYzhLg2v9z9iBcUtrvqnq6AZA2xO6zJQeF6XDybTCD88F5u4vwV0oSuQ9osIBFcMZD'
+app = Flask(__name__)
 
 def get_text_of_post():
     try:
@@ -52,7 +53,7 @@ def get_prediction():
             li.append(_prediction)
             d[i]=li
         print(d)
-app = Flask(__name__)
+
 @app.route('/post_list',methods=['GET'])
 def post_table():
     # newlist=['আমাদের তথাকথিত জাগ্রত ভাইদের মধ্যে পোস্ট পড়ে তারা যা দেখছে তা না দেখা পর্যন্ত ইহুদিরা আমাদের কতটা বোকা মনে করে তাতে আমি অপমানিত','পশ্চিমা সভ্যতার ইহুদিবাদী-ইঞ্জিনিয়ার্ড ইচ্ছাকৃত ধ্বংসের উপর একটি রঙিন চিত্রিত একশো বত্রিশ পৃষ্ঠার ই-বুক বিনামূল্যে ডাউনলোডের জন্য নীচে ক্লিক করুন','বর্তমান সময়ে টিকে থাকা প্রচুর কঠিন','আমি এই পেজটি খুলেছি কিছু নতুন করে শিক্ষার আশায়']

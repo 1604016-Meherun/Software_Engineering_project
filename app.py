@@ -1,4 +1,5 @@
-from flask import Flask, render_template, flash, redirect, url_for, session, request, logging
+from flask import Flask
+import render_template, flash, redirect, url_for, session, request, logging
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
@@ -9,6 +10,8 @@ import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from wtforms.fields import EmailField
+#import facebook
+import joblib
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -119,9 +122,9 @@ def logout():
 
 
 class RegisterForm(Form):
-    name = StringField('Name', [validators.length(min=3, max=50)], render_kw={'autofocus': True})
-    username = StringField('Username', [validators.length(min=3, max=25)])
-    email = EmailField('Email', [validators.DataRequired(), validators.Email(), validators.length(min=4, max=25)])
+    name = StringField('Name', [validators.length(min=3, max=200)], render_kw={'autofocus': True})
+    username = StringField('Username', [validators.length(min=3, max=200)])
+    email = EmailField('Email', [validators.DataRequired(), validators.Email(), validators.length(min=4, max=200)])
     password = PasswordField('Password', [validators.length(min=3)])
 
 
@@ -150,102 +153,79 @@ def register():
 
         return redirect(url_for('index'))
     return render_template('register.html', form=form)
+
+token='EAAJBlNIzKkQBAEtE2Y6zHcvrQFzyc8bhKuBCQapSwj2XWr2I1gFshZARZAjpDhUg791TDbZA0wAo8TB2yk3mfiZB5YqhsiphAILu5i1vfpCsAx4JWuGMkZA8ZAzW2VJwRUMiRDcYdJBMWWBI1TPdIBsRNTWfft1QE56YZB2DFGlBVbkh6G6VRBBYoqdSL1o7uLVefe5NZCXQvwZDZD'
 @app.route('/text')
-def text():
+def home():
 	return render_template('homesus.html')
 
-    
+
 @app.route('/predict',methods=['POST'])
 def predict():
-	df= pd.read_csv("Dataset_SE_Bangla.csv")
-	#df.drop(['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], axis=1, inplace=True)
-	# Features and Labels
-	#df['label'] = df['class'].map({'ham': 0, 'spam': 1})
-	X = df['Text']
-	y = df['Category']
-	
-	# Extract Feature With CountVectorizer
-	cv = TfidfVectorizer()
-	X = cv.fit_transform(X) # Fit the Data
-	from sklearn.model_selection import train_test_split
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
-	#Naive Bayes Classifier
-	from sklearn.naive_bayes import MultinomialNB
-
-	clf = MultinomialNB()
-	clf.fit(X_train,y_train)
-	clf.score(X_test,y_test)
-	#Alternative Usage of Saved Model
-	# joblib.dump(clf, 'NB_spam_model.pkl')
-	# NB_spam_model = open('NB_spam_model.pkl','rb')
-	# clf = joblib.load(NB_spam_model)
-
-	if request.method == 'POST':
-		message = request.form['message']
-		data = [message]
-		vect = cv.transform(data).toarray()
-		my_prediction = clf.predict(vect)
-	return render_template('result.html',prediction = my_prediction)
-
-
-"""class MessageForm(Form):    # Create Message Form
-    body = StringField('', [validators.length(min=1)], render_kw={'autofocus': True})
-
-
-@app.route('/chatting/<string:id>', methods=['GET', 'POST'])
-def chatting(id):
-    if 'uid' in session:
-        form = MessageForm(request.form)
-        # Create cursor
-        cur = mysql.connection.cursor()
-
-        # lid name
-        get_result = cur.execute("SELECT * FROM users WHERE id=%s", [id])
-        l_data = cur.fetchone()
-        if get_result > 0:
-            session['name'] = l_data['name']
-            uid = session['uid']
-            session['lid'] = id
-
-            if request.method == 'POST' and form.validate():
-                txt_body = form.body.data
-                # Create cursor
-                cur = mysql.connection.cursor()
-                cur.execute("INSERT INTO messages(body, msg_by, msg_to) VALUES(%s, %s, %s)",
-                            (txt_body, id, uid))
-                # Commit cursor
-                mysql.connection.commit()
-
-            # Get users
-            cur.execute("SELECT * FROM users")
-            users = cur.fetchall()
-
-            # Close Connection
-            cur.close()
-            return render_template('chat_room.html', users=users, form=form)
-        else:
-            flash('No permission!', 'danger')
-            return redirect(url_for('index'))
+    message=request.form['message']
+    df=pd.read_csv("dataset_SE_Bangla.csv")
+    X=df["Text"]
+    cv=TfidfVectorizer()
+    X=cv.fit_transform(X)
+    infile = open('suspicious_model','rb')
+    model = joblib.load(infile)
+    data=[message]
+    vecct=cv.transform(data).toarray()
+    _prediction = int(model.predict(vecct))
+    if _prediction ==0:
+        message="✅"+message
     else:
-        return redirect(url_for('login'))
+        message="❌"+message
+    page_access_token = token
+    graph = facebook.GraphAPI(page_access_token)
+    facebook_page_id = '101432762410121'
+    graph.put_object(facebook_page_id, "feed", message=message)
+    return render_template('homesus.html',message=message,prediction=_prediction)
 
+def get_text_of_post():
+    try:
+        graph=facebook.GraphAPI(access_token=token,version=3.1)
+        posts=graph.request('101432762410121/posts')['data']
+        d={}
+        i=0
+        for dic in posts:
+            newlist=[]
+            newlist.append(dic['message'])
+            newlist.append(dic['id'])
+            d[i]=newlist
+            i=i+1
+        return d
+    except Exception as e:
+        return 0
 
-@app.route('/chats', methods=['GET', 'POST'])
-def chats():
-    if 'lid' in session:
-        id = session['lid']
-        uid = session['uid']
-        # Create cursor
-        cur = mysql.connection.cursor()
-        # Get message here
-        cur.execute("SELECT * FROM messages WHERE (msg_by=%s AND msg_to=%s) OR (msg_by=%s AND msg_to=%s) "
-                    "ORDER BY id ASC", (id, uid, uid, id))
-        chats = cur.fetchall()
-        # Close Connection
-        cur.close()
-        return render_template('chats.html', chats=chats,)
-    return redirect(url_for('login'))"""
-
+@app.route('/dashboard',methods=['GET','POST'])
+def post_table():
+    # newlist=['আমাদের তথাকথিত জাগ্রত ভাইদের মধ্যে পোস্ট পড়ে তারা যা দেখছে তা না দেখা পর্যন্ত ইহুদিরা আমাদের কতটা বোকা মনে করে তাতে আমি অপমানিত','পশ্চিমা সভ্যতার ইহুদিবাদী-ইঞ্জিনিয়ার্ড ইচ্ছাকৃত ধ্বংসের উপর একটি রঙিন চিত্রিত একশো বত্রিশ পৃষ্ঠার ই-বুক বিনামূল্যে ডাউনলোডের জন্য নীচে ক্লিক করুন','বর্তমান সময়ে টিকে থাকা প্রচুর কঠিন','আমি এই পেজটি খুলেছি কিছু নতুন করে শিক্ষার আশায়']
+    newlist={}
+    newlist=get_text_of_post()
+    if newlist==0:
+        print("check the facebook access")
+    else:
+        df=pd.read_csv("dataset_SE_Bangla.csv")
+        X=df["Text"]
+        cv=TfidfVectorizer()
+        X=cv.fit_transform(X)
+        #predict_from_file with joblib
+        #joblib.dump(clf, 'suspicious_model')
+        d={}
+        infile = open('suspicious_model','rb')
+        model = joblib.load(infile)
+        for i in range(0,len(newlist)):
+            li=[]
+            data=[newlist[i][0]]
+            li.append(newlist[i][0])
+            li.append(newlist[i][1])
+            vecct=cv.transform(data).toarray()
+            
+            _prediction = int(model.predict(vecct))
+            li.append(_prediction)
+            d[i]=li
+    return render_template('post_list.php',newlist=d)
 
 if __name__ == '__main__':
     app.run(debug=True)
